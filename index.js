@@ -932,9 +932,7 @@ void main () {
 
     let u_world = m4.yRotation(Math.PI * 0.5);
     u_world = m4.translate(u_world, ...objOffset);
-    let moaiX = 27.5;
-    let moaiY = 44.4;
-    let moaiZ = 59;
+    
 
     // Space
     for (const { bufferInfo, vao, material } of parts) {
@@ -956,9 +954,20 @@ void main () {
 
     // Moai head 
     for (const { bufferInfo, vao, material } of secondParts) {
+      const moaiX = 27.5;
+      const moaiY = 44.4;
+      const moaiZ = 59;
       
+      let walkAnim = time;
+  
+      if (moaiZ - time >= -10) {
+        walkAnim += time;
+      } else {
+        walkAnim = moaiZ + 80;
+      }
+
       const scaledMoai = m4.scale(u_world, .2, .2, .2);
-      const translatedMoai = m4.translate(scaledMoai, moaiX, moaiY, moaiZ - time);
+      const translatedMoai = m4.translate(scaledMoai, moaiX, moaiY, moaiZ - walkAnim);
       const rotatedMoai = m4.yRotation(Math.PI+1.2);
       m4.multiply(rotatedMoai, translatedMoai, rotatedMoai)
       gl.bindVertexArray(vao);
@@ -981,6 +990,7 @@ void main () {
       if (elapsedTime > jumpDuration) {
         jumpStartTime = performance.now();
       }
+
       const scaledWorld = m4.scale(u_world, 4, 4, 4);
       const translatedUWorld = m4.translate(scaledWorld, 1.7, 3.5 + jumpOffsetY, 0.92);
       const rotatedPerson = m4.zRotation(Math.PI * 2 + 0.2);
