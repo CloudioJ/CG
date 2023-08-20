@@ -496,36 +496,6 @@ void main () {
       });
   }
 
-  //Load fourth object
-  const fourthObjHref = "scene/objects/GF1.obj";
-  const fourthObjResponse = await fetch(fourthObjHref);
-  const fourthObjText = await fourthObjResponse.text();
-  const fourthObj = parseOBJ(fourthObjText);
-  const fourthBaseHref = new URL(fourthObjHref, window.location.href);
-  const fourthMatTexts = await Promise.all(
-    fourthObj.materialLibs.map(async (filename) => {
-      const matHref = new URL(filename, fourthBaseHref).href;
-      const response = await fetch(matHref);
-      return await response.text();
-    })
-  );
-
-  const fourthMaterials = parseMTL(fourthMatTexts.join("\n"));
-
-  for (const material of Object.values(fourthMaterials)) {
-    Object.entries(material)
-      .filter(([key]) => key.endsWith("Map"))
-      .forEach(([key, filename]) => {
-        let texture = textures[filename];
-        if (!texture) {
-          const textureHref = new URL(filename, fourthBaseHref).href;
-          texture = twgl.createTexture(gl, { src: textureHref, flipY: true });
-          textures[filename] = texture;
-        }
-        material[key] = texture;
-      });
-  }
-
   // hack the materials so we can see the specular map
   Object.values(materials).forEach((m) => {
     m.shininess = 125;
@@ -654,38 +624,6 @@ void main () {
     };
   });
 
-  const fourthParts = fourthObj.geometries.map(({ material, data }) => {
-    if (data.color) {
-      if (data.position.length === data.color.length) {
-        data.color = { numComponents: 3, data: data.color };
-      }
-    } else {
-      data.color = { value: [1, 1, 1, 1] };
-    }
-
-    if (!data.texcoord) {
-      data.texcoord = { value: [0, 0] };
-    }
-
-    if (!data.normal) {
-      data.normal = { value: [0, 0, 1] };
-
-    }
-
-    // Ensure the texture mappings are correct
-    const texturedMaterial = {
-      ...defaultMaterial,
-      ...fourthMaterials[material],
-    };
-
-    const bufferInfo = twgl.createBufferInfoFromArrays(gl, data);
-    const vao = twgl.createVAOFromBufferInfo(gl, meshProgramInfo, bufferInfo);
-    return {
-      material: texturedMaterial,
-      bufferInfo,
-      vao
-    };
-  });
 
   function getExtents(positions) {
     const min = positions.slice(0, 3);
@@ -718,19 +656,14 @@ void main () {
 
   const extents = getGeometriesExtents(obj.geometries);
   const range = m4.subtractVectors(extents.max, extents.min);
-  // amount to move the object so its center is at the origin
   const objOffset = m4.scaleVector(
     m4.addVectors(extents.min, m4.scaleVector(range, 0.5)),
     -1
   );
-  // const cameraTarget = [controlPoints[0][0],controlPoints[0][1],controlPoints[0][2]];
   const cameraTarget = [0, 0, 0];
-  // figure out how far away to move the camera so we can likely
-  // see the object.
   const radius = m4.length(range) * 0.5 / Math.tan((30 * Math.PI) / 180);
   const cameraPosition = m4.addVectors(cameraTarget, [1, 1, radius]);
-  // Set zNear and zFar to something hopefully appropriate
-  // for the size of this object.
+
   const zNear = radius / 1000;
   const zFar = radius * 100;
 
@@ -739,11 +672,9 @@ void main () {
   }
 
   // Additional camera-related variables
-  const cameraSpeed = 0.1;
   let cameraHorizontalAngle = 0;
 
-  // New variables for camera animation
-  let animationDuration = 10000; // Animation duration in milliseconds
+  let animationDuration = 10000; 
 
   let animationDurationInput = document.getElementById(
     "animationDurationInput"
@@ -957,7 +888,7 @@ void main () {
       const moaiX = 27.5;
       const moaiY = 44.4;
       const moaiZ = 59;
-      
+
       let walkAnim = time;
   
       if (moaiZ - time >= -10) {
