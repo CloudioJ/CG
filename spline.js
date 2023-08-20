@@ -347,63 +347,60 @@ async function main() {
   `;
 
   const fs = `#version 300 es
-  precision highp float;
+precision highp float;
 
-  in vec3 v_normal;
-  in vec3 v_tangent;
-  in vec3 v_surfaceToView;
-  in vec2 v_texcoord;
-  in vec4 v_color;
+in vec3 v_normal;
+in vec3 v_tangent;
+in vec3 v_surfaceToView;
+in vec2 v_texcoord;
+in vec4 v_color;
 
-  uniform vec3 diffuse;
-  uniform sampler2D diffuseMap;
-  uniform vec3 ambient;
-  uniform vec3 emissive;
-  uniform vec3 specular;
-  uniform sampler2D specularMap;
-  uniform float shininess;
-  uniform sampler2D normalMap;
-  uniform float opacity;
-  uniform vec3 u_lightDirection;
-  uniform vec3 u_ambientLight;
+uniform vec3 diffuse;
+uniform sampler2D diffuseMap;
+uniform vec3 ambient;
+uniform vec3 emissive;
+uniform vec3 specular;
+uniform sampler2D specularMap;
+uniform float shininess;
+uniform sampler2D normalMap;
+uniform float opacity;
+uniform vec3 u_lightDirection;
+uniform vec3 u_ambientLight;
 
-  out vec4 outColor;
+out vec4 outColor;
 
-  void main () {
-    vec3 normal = normalize(v_normal) * ( float( gl_FrontFacing ) * 2.0 - 1.0 );
-    vec3 tangent = normalize(v_tangent) * ( float( gl_FrontFacing ) * 2.0 - 1.0 );
+void main () {
+    vec3 normal = normalize(v_normal) * (float(gl_FrontFacing) * 2.0 - 1.0);
+    vec3 tangent = normalize(v_tangent) * (float(gl_FrontFacing) * 2.0 - 1.0);
     vec3 bitangent = normalize(cross(normal, tangent));
 
     mat3 tbn = mat3(tangent, bitangent, normal);
-    normal = texture(normalMap, v_texcoord).rgb * 2. - 1.;
+    normal = texture(normalMap, v_texcoord).rgb * 2.0 - 1.0;
     normal = normalize(tbn * normal);
 
+    vec3 lightDirection = normalize(u_lightDirection);
     vec3 surfaceToViewDirection = normalize(v_surfaceToView);
-    vec3 halfVector = normalize(u_lightDirection + surfaceToViewDirection);
+    vec3 halfVector = normalize(lightDirection + surfaceToViewDirection);
 
-    float fakeLight = dot(u_lightDirection, normal) * .5 + .5;
-    float specularLight = clamp(dot(normal, halfVector), 0.0, 1.0);
-    vec4 specularMapColor = texture(specularMap, v_texcoord);
-    vec3 effectiveSpecular = specular * specularMapColor.rgb;
+    float diffuseLight = max(dot(normal - 1.0, lightDirection), 1.0);
+    float specularLight = pow(max(dot(normal, halfVector) - 0.5, 0.1), shininess);
 
     vec4 diffuseMapColor = texture(diffuseMap, v_texcoord);
     vec3 effectiveDiffuse = diffuse * diffuseMapColor.rgb * v_color.rgb;
-    float effectiveOpacity = opacity * diffuseMapColor.a * v_color.a;
+    vec3 effectiveSpecular = specular * texture(specularMap, v_texcoord).rgb;
 
-    outColor = vec4(
-        emissive +
-        ambient * u_ambientLight +
-        effectiveDiffuse * fakeLight +
-        effectiveSpecular * pow(specularLight, shininess),
-        effectiveOpacity);
-  }
-  `;
+    vec3 lighting = ambient * u_ambientLight +
+                    effectiveDiffuse * diffuseLight +
+                    effectiveSpecular * specularLight;
 
+    outColor = vec4(emissive + lighting, opacity * diffuseMapColor.a * v_color.a);
+}
+`;
   // compiles and links the shaders, looks up attribute and uniform locations
   const meshProgramInfo = twgl.createProgramInfo(gl, [vs, fs]);
 
-  const objHref =
-    "scene/fuji/fuji.obj";
+  //Load first object
+  const objHref = "scene/house2/model.obj";
   const response = await fetch(objHref);
   const text = await response.text();
   const obj = parseOBJ(text);
@@ -415,7 +412,7 @@ async function main() {
       return await response.text();
     })
   );
-  const materials = parseMTL('scene/models/Chess.');
+  const materials = parseMTL(matTexts.join("\n"));
 
   const textures = {
     defaultWhite: twgl.createTexture(gl, { src: [255, 255, 255, 255] }),
@@ -437,9 +434,101 @@ async function main() {
       });
   }
 
+
+  //Load second object
+  const secondObjHref = "scene/objects/Moai_160k_ZR.obj";
+  const secondObjResponse = await fetch(secondObjHref);
+  const secondObjText = await secondObjResponse.text();
+  const secondObj = parseOBJ(secondObjText);
+  const secondBaseHref = new URL(secondObjHref, window.location.href);
+  const secondMatTexts = await Promise.all(
+    secondObj.materialLibs.map(async (filename) => {
+      const matHref = new URL(filename, secondBaseHref).href;
+      const response = await fetch(matHref);
+      return await response.text();
+    })
+  );
+
+  const secondMaterials = parseMTL(secondMatTexts.join("\n"));
+
+  for (const material of Object.values(secondMaterials)) {
+    Object.entries(material)
+      .filter(([key]) => key.endsWith("Map"))
+      .forEach(([key, filename]) => {
+        let texture = textures[filename];
+        if (!texture) {
+          const textureHref = new URL(filename, secondBaseHref).href;
+          texture = twgl.createTexture(gl, { src: textureHref, flipY: true });
+          textures[filename] = texture;
+        }
+        material[key] = texture;
+      });
+  }
+
+
+  //Load third object
+  const thirdObjHref = "scene/characters/model_mesh.obj";
+  const thirdObjResponse = await fetch(thirdObjHref);
+  const thirdObjText = await thirdObjResponse.text();
+  const thirdObj = parseOBJ(thirdObjText);
+  const thirdBaseHref = new URL(thirdObjHref, window.location.href);
+  const thirdMatTexts = await Promise.all(
+    thirdObj.materialLibs.map(async (filename) => {
+      const matHref = new URL(filename, thirdBaseHref).href;
+      const response = await fetch(matHref);
+      return await response.text();
+    })
+  );
+
+  const thirdMaterials = parseMTL(thirdMatTexts.join("\n"));
+
+  for (const material of Object.values(thirdMaterials)) {
+    Object.entries(material)
+      .filter(([key]) => key.endsWith("Map"))
+      .forEach(([key, filename]) => {
+        let texture = textures[filename];
+        if (!texture) {
+          const textureHref = new URL(filename, thirdBaseHref).href;
+          texture = twgl.createTexture(gl, { src: textureHref, flipY: true });
+          textures[filename] = texture;
+        }
+        material[key] = texture;
+      });
+  }
+
+  //Load fourth object
+  const fourthObjHref = "scene/objects/InteriorDoor.obj";
+  const fourthObjResponse = await fetch(fourthObjHref);
+  const fourthObjText = await fourthObjResponse.text();
+  const fourthObj = parseOBJ(fourthObjText);
+  const fourthBaseHref = new URL(fourthObjHref, window.location.href);
+  const fourthMatTexts = await Promise.all(
+    fourthObj.materialLibs.map(async (filename) => {
+      const matHref = new URL(filename, thirdBaseHref).href;
+      const response = await fetch(matHref);
+      return await response.text();
+    })
+  );
+
+  const fourthMaterials = parseMTL(fourthMatTexts.join("\n"));
+
+  for (const material of Object.values(fourthMaterials)) {
+    Object.entries(material)
+      .filter(([key]) => key.endsWith("Map"))
+      .forEach(([key, filename]) => {
+        let texture = textures[filename];
+        if (!texture) {
+          const textureHref = new URL(filename, fourthBaseHref).href;
+          texture = twgl.createTexture(gl, { src: textureHref, flipY: true });
+          textures[filename] = texture;
+        }
+        material[key] = texture;
+      });
+  }
+
   // hack the materials so we can see the specular map
   Object.values(materials).forEach((m) => {
-    m.shininess = 25;
+    m.shininess = 125;
     m.specular = [3, 2, 1];
   });
 
@@ -450,23 +539,11 @@ async function main() {
     ambient: [0, 0, 0],
     specular: [1, 1, 1],
     specularMap: textures.defaultWhite,
-    shininess: 400,
+    shininess: 100,
     opacity: 1
   };
 
   const parts = obj.geometries.map(({ material, data }) => {
-    // Because data is just named arrays like this
-    //
-    // {
-    //   position: [...],
-    //   texcoord: [...],
-    //   normal: [...],
-    // }
-    //
-    // and because those names match the attributes in our vertex
-    // shader we can pass it directly into `createBufferInfoFromArrays`
-    // from the article "less code more fun".
-
     if (data.color) {
       if (data.position.length === data.color.length) {
         // it's 3. The our helper library assumes 4 so we need
@@ -509,6 +586,107 @@ async function main() {
     };
   });
 
+  const secondParts = secondObj.geometries.map(({ material, data }) => {
+    if (data.color) {
+      if (data.position.length === data.color.length) {
+        data.color = { numComponents: 3, data: data.color };
+      }
+    } else {
+      data.color = { value: [1, 1, 1, 1] };
+    }
+    
+    if (!data.texcoord) {
+      data.texcoord = { value: [0, 0] };
+    }
+  
+    if (!data.normal) {
+      data.normal = { value: [0, 0, 1] };
+    }
+  
+    // Ensure the texture mappings are correct
+    // const materialObj = secondMaterials[material];
+    const texturedMaterial = {
+      ...defaultMaterial,
+      ...secondMaterials[material],
+    };
+  
+    // Create a buffer for each array by calling
+    // gl.createBuffer, gl.bindBuffer, gl.bufferData
+    const bufferInfo = twgl.createBufferInfoFromArrays(gl, data);
+    const vao = twgl.createVAOFromBufferInfo(gl, meshProgramInfo, bufferInfo);
+    return {
+      material: texturedMaterial,
+      bufferInfo,
+      vao
+    };
+  });
+
+  const thirdParts = thirdObj.geometries.map(({ material, data }) => {
+    if (data.color) {
+      if (data.position.length === data.color.length) {
+        data.color = { numComponents: 3, data: data.color };
+      }
+    } else {
+      data.color = { value: [1, 1, 1, 1] };
+    }
+
+    if (!data.texcoord) {
+      data.texcoord = { value: [0, 0] };
+    }
+
+    if (!data.normal) {
+      data.normal = { value: [0, 0, 1] };
+
+    }
+
+    // Ensure the texture mappings are correct
+    const texturedMaterial = {
+      ...defaultMaterial,
+      ...thirdMaterials[material],
+    };
+
+    const bufferInfo = twgl.createBufferInfoFromArrays(gl, data);
+    const vao = twgl.createVAOFromBufferInfo(gl, meshProgramInfo, bufferInfo);
+    return {
+      material: texturedMaterial,
+      bufferInfo,
+      vao
+    };
+  });
+
+  const fourthParts = thirdObj.geometries.map(({ material, data }) => {
+    if (data.color) {
+      if (data.position.length === data.color.length) {
+        data.color = { numComponents: 3, data: data.color };
+      }
+    } else {
+      data.color = { value: [1, 1, 1, 1] };
+    }
+
+    if (!data.texcoord) {
+      data.texcoord = { value: [0, 0] };
+    }
+
+    if (!data.normal) {
+      data.normal = { value: [0, 0, 1] };
+
+    }
+
+    // Ensure the texture mappings are correct
+    const texturedMaterial = {
+      ...defaultMaterial,
+      ...fourthMaterials[material],
+    };
+
+    const bufferInfo = twgl.createBufferInfoFromArrays(gl, data);
+    const vao = twgl.createVAOFromBufferInfo(gl, meshProgramInfo, bufferInfo);
+    return {
+      material: texturedMaterial,
+      bufferInfo,
+      vao
+    };
+  });
+
   function getExtents(positions) {
     const min = positions.slice(0, 3);
     const max = positions.slice(0, 3);
@@ -545,15 +723,16 @@ async function main() {
     m4.addVectors(extents.min, m4.scaleVector(range, 0.5)),
     -1
   );
+  // const cameraTarget = [controlPoints[0][0],controlPoints[0][1],controlPoints[0][2]];
   const cameraTarget = [0, 0, 0];
   // figure out how far away to move the camera so we can likely
   // see the object.
-  const radius = m4.length(range) * 0.5;
-  const cameraPosition = m4.addVectors(cameraTarget, [0, 0, radius]);
+  const radius = m4.length(range) * 0.5 / Math.tan((30 * Math.PI) / 180);
+  const cameraPosition = m4.addVectors(cameraTarget, [1, 1, radius]);
   // Set zNear and zFar to something hopefully appropriate
   // for the size of this object.
-  const zNear = radius / 100;
-  const zFar = radius * 3;
+  const zNear = radius / 1000;
+  const zFar = radius * 100;
 
   function degToRad(deg) {
     return (deg * Math.PI) / 180;
@@ -564,51 +743,49 @@ async function main() {
   let cameraHorizontalAngle = 0;
 
   // New variables for camera animation
-  const animationDuration = 10000; // Animation duration in milliseconds
-  const numPoints = 36; // Number of points in the bezier curve
+  let animationDuration = 10000; // Animation duration in milliseconds
+
+  let animationDurationInput = document.getElementById(
+    "animationDurationInput"
+  );
+  
+  animationDurationInput.addEventListener("input", () => {
+    animationDuration = parseFloat(animationDurationInput.value); // Convert to milliseconds
+  });
+
+  const numPoints = 5; // Number of points in the bezier curve
   const controlPoints = [
-    // [10, 5], // Control point 1 [x, y]
-    // [8, -10], // Control point 2 [x, y]
-    // [-10, -5], // Control point 3 [x, y]
-    // [-8, 10] // Control point 4 [x, y]
-    [10, 5],
-    [8, 4],
-    [7, 3],
-    [7, 2],
-    [6, 1],
-    [6, -1],
-    [6, -3],
-    [5, -5],
-    [4, -6],
-    [3, -7],
-    [2, -8],
-    [1, -9],
-    [0, -9.5],
-    [-1, -9],
-    [-2, -8],
-    [-3, -7],
-    [-4, -6],
-    [-5, -5],
-    [-6, -3],
-    [-6, -1],
-    [-6, 1],
-    [-6, 3],
-    [-5, 5],
-    [-4, 6],
-    [-3, 7],
-    [-2, 8],
-    [-1, 9],
-    [0, 9.5],
-    [1, 9],
-    [2, 8],
-    [3, 7],
-    [4, 6],
-    [5, 5],
-    [6, 3],
-    [6, 1],
-    [6, -1],
-    [10, 5]
+    [2.0360216277221825,-1.5699954832406477],
+    [1.938800768020174, -0.2046659899111344],
+    [1.113800768020174, 1.246659899111344],
   ];
+
+  function interpolatePoints(p1, p2, numPoints) {
+    const interpolatedPoints = [];
+
+    for (let i = 1; i < numPoints; i++) {
+        const t = i / numPoints;
+        const x = p1[0] + t * (p2[0] - p1[0]);
+        const y = p1[1] + t * (p2[1] - p1[1]);
+        interpolatedPoints.push([x, y]);
+    }
+
+    return interpolatedPoints;
+  }
+
+  const numPointsToAdd = 2; // You can adjust the number of points to add
+  const newControlPoints = [];
+
+  for (let i = 0; i < controlPoints.length - 1; i++) {
+      const p1 = controlPoints[i];
+      const p2 = controlPoints[i + 1];
+
+      newControlPoints.push(p1, ...interpolatePoints(p1, p2, numPointsToAdd));
+  }
+
+  newControlPoints.push(controlPoints[controlPoints.length - 1]);
+
+  console.log(newControlPoints);
 
   // Function to compute the value of the bezier curve at a given time (t)
   function bezierValue(controlPoints, t) {
@@ -619,8 +796,8 @@ async function main() {
         (factorial(n) / (factorial(i) * factorial(n - i))) *
         Math.pow(t, i) *
         Math.pow(1 - t, n - i);
-      value[0] += controlPoints[i][0] * coefficient;
-      value[1] += controlPoints[i][1] * coefficient;
+      value[0] += controlPoints[i][0]/3 * coefficient;
+      value[1] += controlPoints[i][1]/3 * coefficient;
     }
     return value;
   }
@@ -629,95 +806,62 @@ async function main() {
     if (n === 0 || n === 1) return 1;
     return n * factorial(n - 1);
   }
-
-  // Flag to indicate if the slider animation is running
-  let isAnimating = false;
-
-  // Function to update the camera position along the bezier curve
   
-
-  // function bezierValueWithTangent(controlPoints, t) {
-  //   const n = controlPoints.length - 1;
-  //   let value = [0, 0];
-  //   let tangent = [0, 0];
-  //   for (let i = 0; i <= n; i++) {
-  //     const coefficient =
-  //       (factorial(n) / (factorial(i) * factorial(n - i))) *
-  //       Math.pow(t, i) *
-  //       Math.pow(1 - t, n - i);
-  //     value[0] += controlPoints[i][0] * coefficient;
-  //     value[1] += controlPoints[i][1] * coefficient;
-  //     tangent[0] +=
-  //       i * Math.pow(t, i - 1) * Math.pow(1 - t, n - i) * controlPoints[i][0];
-  //     tangent[1] +=
-  //       i * Math.pow(t, i - 1) * Math.pow(1 - t, n - i) * controlPoints[i][1];
-  //   }
-  //   return { value, tangent };
-  // }
-
-  // function updateCameraPosition(time) {
-    // const t = (time % animationDuration) / animationDuration; // Normalize time between 0 and 1
-    // const interval = 1 / (numPoints - 1);
-    // const segmentIndex = Math.floor(t / interval);
-    // const tInterval = (t % interval) / interval;
-    // const p0 = controlPoints[segmentIndex];
-    // const p1 = controlPoints[segmentIndex + 1];
-    // const cameraX = bezierValue([p0, p1], tInterval)[0];
-    // const cameraY = bezierValue([p0, p1], tInterval)[1];
-    // cameraPosition[0] = cameraX;
-    // cameraPosition[2] = cameraY;
-  // }
-
-  function derivativeBezierValue(controlPoints, t) {
-    const n = controlPoints.length - 1;
-    const derivativePoints = [];
-    for (let i = 0; i < n; i++) {
-      const p0 = controlPoints[i];
-      const p1 = controlPoints[i + 1];
-      const dx = p1[0] - p0[0];
-      const dy = p1[1] - p0[1];
-      derivativePoints.push([dx * n, dy * n]);
-    }
-    return bezierValue(derivativePoints, t);
-  }
-  
+  let currentControlPointIndex = 0;
 
   function updateCameraPosition(time) {
-    const t = (time % animationDuration) / animationDuration; // Normalize time between 0 and 1
+    const t = (time % animationDuration) / animationDuration;
     const interval = 1 / (numPoints - 1);
     const segmentIndex = Math.floor(t / interval);
     const tInterval = (t % interval) / interval;
-    const p0 = controlPoints[segmentIndex];
-    const p1 = controlPoints[segmentIndex + 1];
+    const p0 = newControlPoints[segmentIndex];
+    const p1 = newControlPoints[segmentIndex + 1];
+  
+    cameraHorizontalAngle = degToRad(0.25) 
+    // Calculate camera position along the bezier curve
     const cameraX = bezierValue([p0, p1], tInterval)[0];
-    const cameraY = bezierValue([p0, p1], tInterval)[1];
-    cameraPosition[0] = cameraX;
-    cameraPosition[2] = cameraY;
+    const cameraY = 0; // Keep the camera at the same height
+    const cameraZ = bezierValue([p0, p1], tInterval)[1];
   
-    // Calculate the tangent at the current time
-    const tangent = derivativeBezierValue(controlPoints, t);
+    // Move the camera further from the center
+    const cameraDistance = 15; // Adjust this value to control the camera distance
+    cameraPosition[0] = cameraX * cameraDistance * Math.sin(cameraHorizontalAngle);
+    cameraPosition[1] = cameraY;
+    cameraPosition[2] = cameraZ * cameraDistance * Math.cos(cameraHorizontalAngle);
   
-    // Calculate the new look-at target based on the tangent direction
-    cameraTarget[0] = cameraX + tangent[0];
-    cameraTarget[1] = cameraPosition[1]; // Keep the camera's vertical position unchanged
-    cameraTarget[2] = cameraY + tangent[1];
+    // Calculate the next control point's index
+    const nextControlPointIndex = (currentControlPointIndex + 1) % newControlPoints.length;
+    currentControlPointIndex = nextControlPointIndex;
+    // Update the camera's target towards the next control point
+    cameraTarget[0] = newControlPoints[nextControlPointIndex][0] * cameraDistance;
+    cameraTarget[1] = cameraY;
+    cameraTarget[2] = newControlPoints[nextControlPointIndex][1] * cameraDistance;
+  
+    if (segmentIndex !== currentControlPointIndex) {
+      currentControlPointIndex = segmentIndex;
+    }
   }
-  
+
   function updateCameraTarget() {
+    // Calculate the average position of control points
     const sum = controlPoints.reduce(
       (acc, point) => [acc[0] + point[0], acc[1] + point[1]],
       [0, 0]
     );
     const center = [sum[0] / controlPoints.length, sum[1] / controlPoints.length];
-    cameraTarget[0] = center[0];
-    cameraTarget[2] = center[1];
-  }
   
+    // Update the camera's target further from the center
+    const targetDistance = 2; // Adjust this value to control the target distance
+    cameraTarget[0] = center[0] * targetDistance;
+    cameraTarget[2] = center[1] * targetDistance;
+  }
 
   function startCameraAnimation() {
     let startTime = null;
-
+    let isAnimating = true;
     function animate(timestamp) {
+
+      // const animationDuration = parseFloat(animationDurationInput.value);
       if (!startTime) startTime = timestamp;
       const elapsedTime = timestamp - startTime;
 
@@ -734,28 +878,54 @@ async function main() {
     requestAnimationFrame(animate);
   }
 
-  function render(time) {
-    time *= 0.0; // convert to seconds
+  const animateButton = document.getElementById("animateButton");
+    animateButton.addEventListener("click", () => {
+      startCameraAnimation();
+    });
 
+
+  // const cameraSlider = document.getElementById("cameraSlider");
+  // cameraSlider.addEventListener("input", () => {
+  //   const sliderValue = parseFloat(cameraSlider.value);
+  //   const t = sliderValue / 360; // Normalize slider value between 0 and 1
+  //   const time = t * animationDuration; // Calculate corresponding time value
+  //   isAnimation = true;
+  //   updateCameraPosition(time); // Update the camera position based on the time value
+  // });
+
+  const cameraSlider = document.getElementById("cameraSlider");
+  cameraSlider.addEventListener("input", () => {
+    const sliderValue = parseFloat(cameraSlider.value);
+    const normalizedValue = sliderValue / 360;
+    const targetTime = normalizedValue * animationDuration;
+    updateCameraPosition(targetTime);
+  });
+    
+  let jumpStartTime = performance.now();
+  const jumpDuration = 1.0; // Adjust the jump duration as needed
+  const jumpAmplitude = 0.2; // Adjust the jump amplitude as needed
+
+  function render(time) {
+    time *= 0.001; // convert to seconds
     updateCameraTarget();
     twgl.resizeCanvasToDisplaySize(gl.canvas);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     gl.enable(gl.DEPTH_TEST);
 
-    const fieldOfViewRadians = degToRad(60);
+    const fieldOfViewRadians = degToRad(80);
     const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
     const projection = m4.perspective(fieldOfViewRadians, aspect, zNear, zFar);
 
     const up = [0, 1, 0];
     // Compute the camera's matrix using look at.
     const camera = m4.lookAt(cameraPosition, cameraTarget, up);
-
     // Make a view matrix from the camera matrix.
     const view = m4.inverse(camera);
+    const lookAtMatrix = m4.lookAt(cameraPosition, cameraTarget, up);
 
     const sharedUniforms = {
-      u_lightDirection: m4.normalize([-1, 3, 5]),
-      u_view: view,
+      u_lightDirection: m4.normalize([2, 1, 5]),
+      u_view: lookAtMatrix,
       u_projection: projection,
       u_viewWorldPosition: cameraPosition
     };
@@ -765,79 +935,97 @@ async function main() {
     // calls gl.uniform
     twgl.setUniforms(meshProgramInfo, sharedUniforms);
 
-    // compute the world matrix once since all parts
-    // are at the same space.
-    let u_world = m4.yRotation(time);
+    let u_world = m4.yRotation(Math.PI * 0.5);
     u_world = m4.translate(u_world, ...objOffset);
+    let moaiX = 27.5;
+    let moaiY = 44.4;
+    let moaiZ = 59;
+
     updateCameraPosition(time);
 
+    // Space
     for (const { bufferInfo, vao, material } of parts) {
-      // set the attributes for this part.
+
+      const scaledHouse = m4.scale(u_world, 1,1,1);
+      const translatedHouse = m4.translate(scaledHouse, 7, 9, 6);
       gl.bindVertexArray(vao);
-      // calls gl.uniform
+
       twgl.setUniforms(
         meshProgramInfo,
         {
-          u_world
+          u_world: translatedHouse,
         },
         material
       );
-      // calls gl.drawArrays or gl.drawElements
-      twgl.drawBufferInfo(gl, bufferInfo);
-      // Additional code for the slider animation
-      let isAnimating = false;
 
-      // Function to handle the slider animation
-      function animateSlider() {
-        const maxSliderValue = 360;
-        const animationDuration = 5000; // Animation duration in milliseconds
-        let startTime = null;
-
-        // Function to update the camera angle based on the animation progress
-        function updateCameraAngle(progress) {
-          const startValue = 0;
-          const endValue = maxSliderValue;
-          const sliderValue = startValue + (endValue - startValue) * progress;
-          cameraHorizontalAngle = degToRad(sliderValue);
-        }
-
-        function step(timestamp) {
-          if (!startTime) startTime = timestamp;
-          const progress = Math.min(
-            1,
-            (timestamp - startTime) / animationDuration
-          );
-          updateCameraAngle(progress);
-
-          if (progress < 1) {
-            requestAnimationFrame(step);
-          } else {
-            isAnimating = false;
-          }
-        }
-
-        if (!isAnimating) {
-          isAnimating = true;
-          requestAnimationFrame(step);
-        }
-      }
-
-      // Event listener for the animation button
-      const animateButton = document.getElementById("animateButton");
-      animateButton.addEventListener("click", startCameraAnimation);
+      twgl.drawBufferInfo(gl, bufferInfo);      
     }
+
+    // Moai head 
+    for (const { bufferInfo, vao, material } of secondParts) {
+      
+      const scaledMoai = m4.scale(u_world, .2, .2, .2);
+      const translatedMoai = m4.translate(scaledMoai, moaiX, moaiY, moaiZ - time);
+      const rotatedMoai = m4.yRotation(Math.PI+1.2);
+      m4.multiply(rotatedMoai, translatedMoai, rotatedMoai)
+      gl.bindVertexArray(vao);
+      twgl.setUniforms(
+        meshProgramInfo,
+        {
+          u_world: rotatedMoai,
+        },
+        material
+      );
+      twgl.drawBufferInfo(gl, bufferInfo);
+    }
+
+    // Person
+    for (const { bufferInfo, vao, material } of thirdParts) {
+      const elapsedTime = (performance.now() - jumpStartTime) / 1000;
+
+      const jumpOffsetY = jumpAmplitude * Math.sin((Math.PI * 2 / jumpDuration) * elapsedTime);
+
+      if (elapsedTime > jumpDuration) {
+        jumpStartTime = performance.now();
+      }
+      const scaledWorld = m4.scale(u_world, 4, 4, 4);
+      const translatedUWorld = m4.translate(scaledWorld, 1.7, 3.5 + jumpOffsetY, 0.92);
+      const rotatedPerson = m4.zRotation(Math.PI * 2 + 0.2);
+      m4.multiply(rotatedPerson, translatedUWorld, rotatedPerson)
+      const rotatedPersonY = m4.yRotation(Math.PI * 2);
+      m4.multiply(rotatedPersonY, rotatedPerson, rotatedPersonY)
+      gl.bindVertexArray(vao);
+      twgl.setUniforms(
+        meshProgramInfo,
+        {
+          u_world: rotatedPersonY,
+        },
+        material
+      );
+      twgl.drawBufferInfo(gl, bufferInfo);
+    }
+
+    // Door
+    // for (const { bufferInfo, vao, material } of fourthParts) {
+
+    //   const scaledDoor = m4.scale(u_world, 1, 1, 1);
+    //   const translatedDoor = m4.translate(scaledDoor, 0, 5, 0);
+    //   // const rotatedDoor = m4.yRotation(Math.PI+1.2);
+    //   // m4.multiply(rotatedDoor, translatedDoor, rotatedDoor)
+    //   gl.bindVertexArray(vao);
+    //   twgl.setUniforms(
+    //     meshProgramInfo,
+    //     {
+    //       u_world: translatedDoor,
+    //     },
+    //     material
+    //   );
+    //   twgl.drawBufferInfo(gl, bufferInfo);
+    // }
 
     requestAnimationFrame(render);
   }
   requestAnimationFrame(render);
-  // Additional code for the slider
-  const cameraSlider = document.getElementById("cameraSlider");
-  cameraSlider.addEventListener("input", () => {
-    const sliderValue = parseFloat(cameraSlider.value);
-    const t = sliderValue / 360; // Normalize slider value between 0 and 1
-    const time = t * animationDuration; // Calculate corresponding time value
-    updateCameraPosition(time); // Update the camera position based on the time value
-  });
 }
 
 main();

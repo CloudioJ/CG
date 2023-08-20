@@ -3,27 +3,21 @@
     <head>
         <meta charset="UTF-8">
         <title>Home</title>
-        
-        <!-- If using three.js:
-        <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.154.0/build/three.module.js",
-                "GLTFLoader": "https://unpkg.com/three@0.154.0/examples/jsm/loaders/GLTFLoader.js",
-                "OrbitControls": "https://unpkg.com/three@0.154.0/examples/jsm/controls/OrbitControls.js"
-            }
-        } -->
-        <!-- </script> -->
-        <!-- <div>
-            Camera distance: <input type="range" id="camera-slider" min="0" max="200" value="50"> 
-        </div> -->
-        <!-- <input type="range" id="camera-slider" min="0" max="360" value="30" step="1"> -->
     </head>
 
-    <body>
+    <body style="background-color: black;">
+        
         <canvas class="webgl" id="canvas" width="1910" height="941"></canvas>
         <input type="range" min="0" max="360" step="1" value="0" id="cameraSlider">
-        <button id="animateButton">GO!</button>
+        <button id="animateButton">Play</button>
+        <input
+            type="number"
+            id="animationDurationInput"
+            min="1000"
+            max="20000"
+            step="0.1"
+            value="1000"
+        />
         <script src="https://webgl2fundamentals.org/webgl/resources/twgl-full.min.js"></script>
         <script src="https://webgl2fundamentals.org/webgl/resources/m4.js"></script>
         <script src="https://webgl2fundamentals.org/webgl/resources/m3.js"></script>
