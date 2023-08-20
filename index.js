@@ -497,14 +497,14 @@ void main () {
   }
 
   //Load fourth object
-  const fourthObjHref = "scene/objects/InteriorDoor.obj";
+  const fourthObjHref = "scene/objects/GF1.obj";
   const fourthObjResponse = await fetch(fourthObjHref);
   const fourthObjText = await fourthObjResponse.text();
   const fourthObj = parseOBJ(fourthObjText);
   const fourthBaseHref = new URL(fourthObjHref, window.location.href);
   const fourthMatTexts = await Promise.all(
     fourthObj.materialLibs.map(async (filename) => {
-      const matHref = new URL(filename, thirdBaseHref).href;
+      const matHref = new URL(filename, fourthBaseHref).href;
       const response = await fetch(matHref);
       return await response.text();
     })
@@ -654,7 +654,7 @@ void main () {
     };
   });
 
-  const fourthParts = thirdObj.geometries.map(({ material, data }) => {
+  const fourthParts = fourthObj.geometries.map(({ material, data }) => {
     if (data.color) {
       if (data.position.length === data.color.length) {
         data.color = { numComponents: 3, data: data.color };
@@ -856,17 +856,19 @@ void main () {
     cameraTarget[2] = center[1] * targetDistance;
   }
 
+  let isAnimating = false;
+
   function startCameraAnimation() {
     let startTime = null;
-    let isAnimating = true;
+    isAnimating = true;
     function animate(timestamp) {
 
-      // const animationDuration = parseFloat(animationDurationInput.value);
+      if (!isAnimating) return;
+
       if (!startTime) startTime = timestamp;
       const elapsedTime = timestamp - startTime;
-
+      cameraSlider.value = (elapsedTime / animationDuration) * 360;
       if (elapsedTime >= animationDuration) {
-        // Animation complete, stop here
         return;
       }
 
@@ -879,31 +881,27 @@ void main () {
   }
 
   const animateButton = document.getElementById("animateButton");
-    animateButton.addEventListener("click", () => {
-      startCameraAnimation();
-    });
+  animateButton.addEventListener("click", () => {
+    startCameraAnimation();
+  });
 
-
-  // const cameraSlider = document.getElementById("cameraSlider");
-  // cameraSlider.addEventListener("input", () => {
-  //   const sliderValue = parseFloat(cameraSlider.value);
-  //   const t = sliderValue / 360; // Normalize slider value between 0 and 1
-  //   const time = t * animationDuration; // Calculate corresponding time value
-  //   isAnimation = true;
-  //   updateCameraPosition(time); // Update the camera position based on the time value
-  // });
+  const pauseButton = document.getElementById("pauseButton");
+  pauseButton.addEventListener("click", () => {
+    isAnimating = false;
+  });
 
   const cameraSlider = document.getElementById("cameraSlider");
   cameraSlider.addEventListener("input", () => {
-    const sliderValue = parseFloat(cameraSlider.value);
-    const normalizedValue = sliderValue / 360;
+    const normalizedValue = cameraSlider.value / 360;
     const targetTime = normalizedValue * animationDuration;
     updateCameraPosition(targetTime);
   });
     
   let jumpStartTime = performance.now();
-  const jumpDuration = 1.0; // Adjust the jump duration as needed
+  const jumpDuration = 0.8; // Adjust the jump duration as needed
   const jumpAmplitude = 0.2; // Adjust the jump amplitude as needed
+
+  updateCameraPosition(0);
 
   function render(time) {
     time *= 0.001; // convert to seconds
@@ -917,9 +915,7 @@ void main () {
     const projection = m4.perspective(fieldOfViewRadians, aspect, zNear, zFar);
 
     const up = [0, 1, 0];
-    // Compute the camera's matrix using look at.
     const camera = m4.lookAt(cameraPosition, cameraTarget, up);
-    // Make a view matrix from the camera matrix.
     const view = m4.inverse(camera);
     const lookAtMatrix = m4.lookAt(cameraPosition, cameraTarget, up);
 
@@ -932,7 +928,6 @@ void main () {
 
     gl.useProgram(meshProgramInfo.program);
 
-    // calls gl.uniform
     twgl.setUniforms(meshProgramInfo, sharedUniforms);
 
     let u_world = m4.yRotation(Math.PI * 0.5);
@@ -940,8 +935,6 @@ void main () {
     let moaiX = 27.5;
     let moaiY = 44.4;
     let moaiZ = 59;
-
-    updateCameraPosition(time);
 
     // Space
     for (const { bufferInfo, vao, material } of parts) {
@@ -1009,7 +1002,7 @@ void main () {
     // for (const { bufferInfo, vao, material } of fourthParts) {
 
     //   const scaledDoor = m4.scale(u_world, 1, 1, 1);
-    //   const translatedDoor = m4.translate(scaledDoor, 0, 5, 0);
+    //   const translatedDoor = m4.translate(scaledDoor, 0, 0, 0);
     //   // const rotatedDoor = m4.yRotation(Math.PI+1.2);
     //   // m4.multiply(rotatedDoor, translatedDoor, rotatedDoor)
     //   gl.bindVertexArray(vao);
