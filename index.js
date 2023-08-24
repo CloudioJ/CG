@@ -496,36 +496,6 @@ void main () {
       });
   }
 
-  //Load fourth object
-  const fourthObjHref = "scene/objects/InteriorDoor.obj";
-  const fourthObjResponse = await fetch(fourthObjHref);
-  const fourthObjText = await fourthObjResponse.text();
-  const fourthObj = parseOBJ(fourthObjText);
-  const fourthBaseHref = new URL(fourthObjHref, window.location.href);
-  const fourthMatTexts = await Promise.all(
-    fourthObj.materialLibs.map(async (filename) => {
-      const matHref = new URL(filename, thirdBaseHref).href;
-      const response = await fetch(matHref);
-      return await response.text();
-    })
-  );
-
-  const fourthMaterials = parseMTL(fourthMatTexts.join("\n"));
-
-  for (const material of Object.values(fourthMaterials)) {
-    Object.entries(material)
-      .filter(([key]) => key.endsWith("Map"))
-      .forEach(([key, filename]) => {
-        let texture = textures[filename];
-        if (!texture) {
-          const textureHref = new URL(filename, fourthBaseHref).href;
-          texture = twgl.createTexture(gl, { src: textureHref, flipY: true });
-          textures[filename] = texture;
-        }
-        material[key] = texture;
-      });
-  }
-
   // hack the materials so we can see the specular map
   Object.values(materials).forEach((m) => {
     m.shininess = 125;
@@ -654,38 +624,6 @@ void main () {
     };
   });
 
-  const fourthParts = thirdObj.geometries.map(({ material, data }) => {
-    if (data.color) {
-      if (data.position.length === data.color.length) {
-        data.color = { numComponents: 3, data: data.color };
-      }
-    } else {
-      data.color = { value: [1, 1, 1, 1] };
-    }
-
-    if (!data.texcoord) {
-      data.texcoord = { value: [0, 0] };
-    }
-
-    if (!data.normal) {
-      data.normal = { value: [0, 0, 1] };
-
-    }
-
-    // Ensure the texture mappings are correct
-    const texturedMaterial = {
-      ...defaultMaterial,
-      ...fourthMaterials[material],
-    };
-
-    const bufferInfo = twgl.createBufferInfoFromArrays(gl, data);
-    const vao = twgl.createVAOFromBufferInfo(gl, meshProgramInfo, bufferInfo);
-    return {
-      material: texturedMaterial,
-      bufferInfo,
-      vao
-    };
-  });
 
   function getExtents(positions) {
     const min = positions.slice(0, 3);
@@ -718,19 +656,14 @@ void main () {
 
   const extents = getGeometriesExtents(obj.geometries);
   const range = m4.subtractVectors(extents.max, extents.min);
-  // amount to move the object so its center is at the origin
   const objOffset = m4.scaleVector(
     m4.addVectors(extents.min, m4.scaleVector(range, 0.5)),
     -1
   );
-  // const cameraTarget = [controlPoints[0][0],controlPoints[0][1],controlPoints[0][2]];
   const cameraTarget = [0, 0, 0];
-  // figure out how far away to move the camera so we can likely
-  // see the object.
   const radius = m4.length(range) * 0.5 / Math.tan((30 * Math.PI) / 180);
   const cameraPosition = m4.addVectors(cameraTarget, [1, 1, radius]);
-  // Set zNear and zFar to something hopefully appropriate
-  // for the size of this object.
+
   const zNear = radius / 1000;
   const zFar = radius * 100;
 
@@ -739,11 +672,9 @@ void main () {
   }
 
   // Additional camera-related variables
-  const cameraSpeed = 0.1;
   let cameraHorizontalAngle = 0;
 
-  // New variables for camera animation
-  let animationDuration = 10000; // Animation duration in milliseconds
+  let animationDuration = 10000; 
 
   let animationDurationInput = document.getElementById(
     "animationDurationInput"
@@ -856,17 +787,19 @@ void main () {
     cameraTarget[2] = center[1] * targetDistance;
   }
 
+  let isAnimating = false;
+
   function startCameraAnimation() {
     let startTime = null;
-    let isAnimating = true;
+    isAnimating = true;
     function animate(timestamp) {
 
-      // const animationDuration = parseFloat(animationDurationInput.value);
+      if (!isAnimating) return;
+
       if (!startTime) startTime = timestamp;
       const elapsedTime = timestamp - startTime;
-
+      cameraSlider.value = (elapsedTime / animationDuration) * 360;
       if (elapsedTime >= animationDuration) {
-        // Animation complete, stop here
         return;
       }
 
@@ -879,31 +812,27 @@ void main () {
   }
 
   const animateButton = document.getElementById("animateButton");
-    animateButton.addEventListener("click", () => {
-      startCameraAnimation();
-    });
+  animateButton.addEventListener("click", () => {
+    startCameraAnimation();
+  });
 
-
-  // const cameraSlider = document.getElementById("cameraSlider");
-  // cameraSlider.addEventListener("input", () => {
-  //   const sliderValue = parseFloat(cameraSlider.value);
-  //   const t = sliderValue / 360; // Normalize slider value between 0 and 1
-  //   const time = t * animationDuration; // Calculate corresponding time value
-  //   isAnimation = true;
-  //   updateCameraPosition(time); // Update the camera position based on the time value
-  // });
+  const pauseButton = document.getElementById("pauseButton");
+  pauseButton.addEventListener("click", () => {
+    isAnimating = false;
+  });
 
   const cameraSlider = document.getElementById("cameraSlider");
   cameraSlider.addEventListener("input", () => {
-    const sliderValue = parseFloat(cameraSlider.value);
-    const normalizedValue = sliderValue / 360;
+    const normalizedValue = cameraSlider.value / 360;
     const targetTime = normalizedValue * animationDuration;
     updateCameraPosition(targetTime);
   });
     
   let jumpStartTime = performance.now();
-  const jumpDuration = 1.0; // Adjust the jump duration as needed
+  const jumpDuration = 0.8; // Adjust the jump duration as needed
   const jumpAmplitude = 0.2; // Adjust the jump amplitude as needed
+
+  updateCameraPosition(0);
 
   function render(time) {
     time *= 0.001; // convert to seconds
@@ -917,9 +846,7 @@ void main () {
     const projection = m4.perspective(fieldOfViewRadians, aspect, zNear, zFar);
 
     const up = [0, 1, 0];
-    // Compute the camera's matrix using look at.
     const camera = m4.lookAt(cameraPosition, cameraTarget, up);
-    // Make a view matrix from the camera matrix.
     const view = m4.inverse(camera);
     const lookAtMatrix = m4.lookAt(cameraPosition, cameraTarget, up);
 
@@ -932,16 +859,11 @@ void main () {
 
     gl.useProgram(meshProgramInfo.program);
 
-    // calls gl.uniform
     twgl.setUniforms(meshProgramInfo, sharedUniforms);
 
     let u_world = m4.yRotation(Math.PI * 0.5);
     u_world = m4.translate(u_world, ...objOffset);
-    let moaiX = 27.5;
-    let moaiY = 44.4;
-    let moaiZ = 59;
-
-    updateCameraPosition(time);
+    
 
     // Space
     for (const { bufferInfo, vao, material } of parts) {
@@ -963,9 +885,20 @@ void main () {
 
     // Moai head 
     for (const { bufferInfo, vao, material } of secondParts) {
-      
+      const moaiX = 27.5;
+      const moaiY = 44.4;
+      const moaiZ = 59;
+
+      let walkAnim = time;
+  
+      if (moaiZ - time >= -10) {
+        walkAnim += time;
+      } else {
+        walkAnim = moaiZ + 80;
+      }
+
       const scaledMoai = m4.scale(u_world, .2, .2, .2);
-      const translatedMoai = m4.translate(scaledMoai, moaiX, moaiY, moaiZ - time);
+      const translatedMoai = m4.translate(scaledMoai, moaiX, moaiY, moaiZ - walkAnim);
       const rotatedMoai = m4.yRotation(Math.PI+1.2);
       m4.multiply(rotatedMoai, translatedMoai, rotatedMoai)
       gl.bindVertexArray(vao);
@@ -988,6 +921,7 @@ void main () {
       if (elapsedTime > jumpDuration) {
         jumpStartTime = performance.now();
       }
+
       const scaledWorld = m4.scale(u_world, 4, 4, 4);
       const translatedUWorld = m4.translate(scaledWorld, 1.7, 3.5 + jumpOffsetY, 0.92);
       const rotatedPerson = m4.zRotation(Math.PI * 2 + 0.2);
@@ -1009,7 +943,7 @@ void main () {
     // for (const { bufferInfo, vao, material } of fourthParts) {
 
     //   const scaledDoor = m4.scale(u_world, 1, 1, 1);
-    //   const translatedDoor = m4.translate(scaledDoor, 0, 5, 0);
+    //   const translatedDoor = m4.translate(scaledDoor, 0, 0, 0);
     //   // const rotatedDoor = m4.yRotation(Math.PI+1.2);
     //   // m4.multiply(rotatedDoor, translatedDoor, rotatedDoor)
     //   gl.bindVertexArray(vao);
