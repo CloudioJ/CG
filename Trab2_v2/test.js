@@ -1,0 +1,1 @@
+d=Curve(((J (1-t)+O t) (1-t)+(O (1-t)+P t) t) (1-t)+(O (1-t)+P t (1-t)+(P (1-t)+Q t) t) t,t,0,1)

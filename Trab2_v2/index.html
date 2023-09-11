@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Trabalho 2 - Claudio</title>
+    </head>
+
+    <body style="background-color: grey;">
+        
+        <canvas class="webgl" id="canvas" width="1430" height="700" style="background-color: lightblue;"></canvas>
+        <input type="range" min="0" max="360" step="1" value="0" id="cameraSlider">
+        <button id="animateButton">Play</button>
+        <button id="pauseButton">Pause</button>
+        <input
+            type="number"
+            id="animationDurationInput"
+            min="1000"
+            max="20000"
+            step="0.1"
+            value="1000"
+        />
+        <script src="https://twgljs.org/dist/4.x/twgl-full.min.js"></script>
+        <script src="https://webglfundamentals.org/webgl/resources/3d-math.js"></script>
+        <script src="https://webglfundamentals.org/webgl/resources/webgl-utils.js"></script>
+        <script src="https://webglfundamentals.org/webgl/resources/m4.js"></script>
+        <script src="https://webglfundamentals.org/webgl/resources/primitives.js"></script>
+
+        <script type="text/javascript" src="controlpoints.js"></script>
+        <script type="text/javascript" src="camera.js"></script>
+
+        <script id="sky_vs" type="x-shader/x-fragment">
+            attribute vec4 a_position;
+            varying vec4 v_position;
+            void main() {
+                v_position = a_position;
+                gl_Position = a_position;
+                gl_Position.z = 1.0;
+            }
+        </script>
+        <script id="sky_fs" type="x-shader/x-fragment">
+            precision mediump float;
+
+            uniform samplerCube u_skybox;
+            uniform mat4 u_viewDirectionProjectionInverse;
+
+            varying vec4 v_position;
+            void main() {
+                vec4 t = u_viewDirectionProjectionInverse * v_position;
+                gl_FragColor = textureCube(u_skybox, normalize(t.xyz / t.w));
+            }
+        </script>
+        <script id="cube_vs" type="x-shader/x-fragment">
+            attribute vec4 a_position;
+            attribute vec4 a_color;
+
+            uniform mat4 u_matrix;
+
+            varying vec4 v_color;
+
+            void main() {
+            // Multiply the position by the matrix.
+            gl_Position = u_matrix * a_position;
+
+            // Pass the color to the fragment shader.
+            v_color = a_color;
+            }
+        </script>
+        <script id="cube_fs" type="x-shader/x-fragment">
+            precision mediump float;
+
+            // Passed in from the vertex shader.
+            varying vec4 v_color;
+
+            uniform vec4 u_colorMult;
+
+            void main() {
+            gl_FragColor = v_color * u_colorMult;
+            }
+        </script>
+        <script type="module" src="skybox.js"></script>
+        <script type="module" src="cube.js"></script>
+        <script type="module" src="ground.js"></script>
+    </body>
+</html>
