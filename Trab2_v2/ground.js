@@ -162,7 +162,7 @@ function run() {
     const projection = m4.perspective(fov, aspect, near, far);
 
     let modelView = m4.yRotate(view, 8);
-    modelView = m4.translate(modelView, -300, -50, -300)
+    modelView = m4.translate(modelView, -300, -150, -300)
     modelView = m4.scale(modelView, 10, 10, 10);
 
     gl.useProgram(programInfo.program);

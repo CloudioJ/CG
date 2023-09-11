@@ -30,12 +30,12 @@ async function main() {
   };
 
   var cubePositions = [
-    [10, 70, 100],
-    [-110, 100, -90],
-    [160, 150, -400],
-    [80, 30, -600],
-    [200, 80, -140],
-    [-80, 50, -400],
+    [10, -30, 100],
+    [-110, 0, -90],
+    [160, 50, -400],
+    [80, -70, -600],
+    [200, -20, -140],
+    [-80, -50, -400],
 ]
 
 function computeMatrix(viewProjectionMatrix, translation, xRotation, yRotation, scale) {

@@ -8,8 +8,8 @@
     <body style="background-color: grey;">
         
         <canvas class="webgl" id="canvas" width="1430" height="700" style="background-color: lightblue;"></canvas>
-        <input type="range" min="0" max="360" step="1" value="0" id="cameraSlider">
-        <button id="animateButton">Play</button>
+        <!-- <input type="range" min="0" max="360" step="1" value="0" id="cameraSlider"> -->
+        <!-- <button id="animateButton">Play</button>
         <button id="pauseButton">Pause</button>
         <input
             type="number"
@@ -18,7 +18,7 @@
             max="20000"
             step="0.1"
             value="1000"
-        />
+        /> -->
         <script src="https://twgljs.org/dist/4.x/twgl-full.min.js"></script>
         <script src="https://webglfundamentals.org/webgl/resources/3d-math.js"></script>
         <script src="https://webglfundamentals.org/webgl/resources/webgl-utils.js"></script>
@@ -77,8 +77,53 @@
             gl_FragColor = v_color * u_colorMult;
             }
         </script>
-        <script type="module" src="skybox.js"></script>
+        <script id="envmap-vertex-shader" type="x-shader/x-fragment">
+            attribute vec4 a_position;
+            attribute vec3 a_normal;
+
+            uniform mat4 u_projection;
+            uniform mat4 u_view;
+            uniform mat4 u_world;
+
+            varying vec3 v_worldPosition;
+            varying vec3 v_worldNormal;
+
+            void main() {
+            // Multiply the position by the matrix.
+            gl_Position = u_projection * u_view * u_world * a_position;
+
+            // send the view position to the fragment shader
+            v_worldPosition = (u_world * a_position).xyz;
+
+            // orient the normals and pass to the fragment shader
+            v_worldNormal = mat3(u_world) * a_normal;
+            }
+        </script>
+        <script id="envmap-fragment-shader" type="x-shader/x-fragment">
+            precision highp float;
+
+            // Passed in from the vertex shader.
+            varying vec3 v_worldPosition;
+            varying vec3 v_worldNormal;
+
+            // The texture.
+            uniform samplerCube u_texture;
+
+            // The position of the camera
+            uniform vec3 u_worldCameraPosition;
+
+            void main() {
+            vec3 worldNormal = normalize(v_worldNormal);
+            vec3 eyeToSurfaceDir = normalize(v_worldPosition - u_worldCameraPosition);
+            vec3 direction = reflect(eyeToSurfaceDir,worldNormal);
+
+            gl_FragColor = textureCube(u_texture, direction);
+            }
+        </script>
+        <!-- <script type="module" src="skybox.js"></script> -->
+        <script type="module" src="test.js"></script>
         <script type="module" src="cube.js"></script>
+        <script type="module" src="ball.js"></script>
         <script type="module" src="ground.js"></script>
     </body>
 </html>

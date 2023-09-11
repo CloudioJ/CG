@@ -41,7 +41,7 @@ function MouseMove(event) {
 
         // Calculate the new target position based on camera rotation
         // var distance = m4.length(m4.subtractVectors(cameraPosition, target));
-        var distance = 10000;
+        var distance = 100000;
         target[0] = cameraPosition[0] + Math.sin(cameraRotation[1]) * Math.cos(cameraRotation[0]) * distance;
         target[1] = cameraPosition[1] + Math.sin(cameraRotation[0]) * distance;
         target[2] = cameraPosition[2] + Math.cos(cameraRotation[1]) * Math.cos(cameraRotation[0]) * distance;
@@ -58,7 +58,7 @@ function MouseRelease(event) {
 }
 
 var fov = degToRad(60);
-var cameraPosition = [-50.37529, 100,97.62443];
+var cameraPosition = [-50.37529, 100, 97.62443];
 var target = [0, 0, 0];
 var up = [0, 1, 0];
 var camera = m4.lookAt(cameraPosition, target, up);
@@ -78,6 +78,7 @@ function animateCamera() {
     
 
     cameraPosition = calculatePoint(points, t);
+    // target = calculatePoint(points, t + 0.01);
     camera = m4.lookAt(cameraPosition, target, up);
     view = m4.inverse(camera);
     requestAnimationFrame(animateCamera);
