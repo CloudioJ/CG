@@ -38,15 +38,60 @@ async function main() {
     [-80, -50, -400],
 ]
 
+  var cubes = cubePositions.map((position) => ({
+    position,
+    visible: true,
+  }));
+
 function computeMatrix(viewProjectionMatrix, translation, xRotation, yRotation, scale) {
   var matrix = m4.identity();
-  matrix = m4.translate(matrix, translation[0], translation[1], translation[2]);
-  matrix = m4.xRotate(matrix, xRotation);
-  matrix = m4.yRotate(matrix, yRotation);
-  matrix = m4.scale(matrix, scale[0], scale[1], scale[2]);
+    matrix = m4.translate(matrix, translation[0], translation[1], translation[2]);
+    matrix = m4.xRotate(matrix, xRotation);
+    matrix = m4.yRotate(matrix, yRotation);
+    matrix = m4.scale(matrix, scale[0], scale[1], scale[2]);
   return m4.multiply(viewProjectionMatrix, matrix);
 }
 
+ // ------------------ MAKE THE BALL
+
+  const sphereBufferInfo = primitives.createSphereWithVertexColorsBufferInfo(gl, 10,12,6);
+    
+  var sphereUniforms = {
+    u_colorMult: [0.5, 1, 0.5, 1],
+    u_matrix: m4.identity(),
+  };
+
+  var ballPosition = [0, 0, 0];
+  var ballVelocity = [0, 0, 0];
+
+  canvas.addEventListener("click", shootBall);
+
+    function shootBall(event) {
+        // Calculate the direction from the camera to the target
+        var rayDirection = m4.normalize(m4.subtractVectors(target, cameraPosition));
+        
+        // Set the initial position and velocity of the ball
+        ballPosition = cameraPosition.slice(); // Copy camera position
+        ballVelocity = [rayDirection[0] * 2, rayDirection[1] * 2, rayDirection[2] * 2]; // Adjust velocity as needed
+    }
+
+    // Function to check if the ball hits an object
+    function checkCollision(position) {
+      for (const cube of cubes) {
+          if (cube.visible) {
+              const distance = m4.distance(position, cube.position);
+              if (distance < 20) { // Adjust this threshold as needed
+                  cube.visible = false; // Cube disappears on collision
+                  return true; // Collision detected
+              }
+          }
+      }
+      return false; // No collision
+  }
+
+
+  // setup GLSL program
+  // var programInfo = webglUtils.createProgramInfo(gl, ["cube_vs", "cube_fs"]);
   requestAnimationFrame(drawScene);
 
   // Draw the scene.
@@ -54,6 +99,9 @@ function computeMatrix(viewProjectionMatrix, translation, xRotation, yRotation, 
     time *= 0.0005;
 
     webglUtils.resizeCanvasToDisplaySize(gl.canvas);
+    ballPosition[0] += ballVelocity[0] * 2;
+    ballPosition[1] += ballVelocity[1] * 2;
+    ballPosition[2] += ballVelocity[2] * 2;
 
     // Tell WebGL how to convert from clip space to pixels
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
@@ -85,34 +133,66 @@ function computeMatrix(viewProjectionMatrix, translation, xRotation, yRotation, 
         invertedCamera
     )
 
+    if (checkCollision(ballPosition)) {
+      // Ball hit an object, so reset its position and velocity
+      ballPosition = [0, 0, 0];
+      ballVelocity = [0, 0, 0];
+
+      // Optionally, you can make the object disappear by removing it from the rendering loop or
+      // by setting its visibility to false in the draw function.
+
+      // You can also add any other logic you need to handle the collision.
+  }
+
     // var viewProjectionMatrix = m4.multiply(projectionMatrix, view);
 
     var cubeXRotation   = -time;
     var cubeYRotation   = time;
     var cubeScale = [1, 1, 1];
+
+    var sphereXRotation   = -time * 20;
+    var sphereYRotation   = time *20;
+    var sphereScale = [1, 1, 1];
     // ------ Draw the sphere --------
 
     gl.useProgram(programInfo.program);
+
+    webglUtils.setBuffersAndAttributes(gl, programInfo, sphereBufferInfo);
+        
+    sphereUniforms.u_matrix = computeMatrix(
+        viewProjectionMatrix,
+        ballPosition,
+        sphereXRotation,
+        sphereYRotation,
+        sphereScale
+    );
+
+    // Set the uniforms we just computed
+    webglUtils.setUniforms(programInfo, sphereUniforms);
+
+    gl.drawArrays(gl.TRIANGLES, 0, sphereBufferInfo.numElements);
 
     // ------ Draw the cube --------
 
     // Setup all the needed attributes.
     webglUtils.setBuffersAndAttributes(gl, programInfo, cubeBufferInfo);
 
-    for(const position of cubePositions) {
-        cubeUniforms.u_matrix = computeMatrix(
-            viewProjectionMatrix,
-            position,
-            cubeXRotation,
-            cubeYRotation,
-            cubeScale
-        );
+    for (const cube of cubes) {
+      if (cube.visible) {
+          cubeUniforms.u_matrix = computeMatrix(
+              viewProjectionMatrix,
+              cube.position,
+              cubeXRotation,
+              cubeYRotation,
+              cubeScale
+          );
 
-        // Set the uniforms we just computed
-        webglUtils.setUniforms(programInfo, cubeUniforms);
+          // Set the uniforms we just computed
+          webglUtils.setUniforms(programInfo, cubeUniforms);
 
-        gl.drawArrays(gl.TRIANGLES, 0, cubeBufferInfo.numElements);
-    }
+          gl.drawArrays(gl.TRIANGLES, 0, cubeBufferInfo.numElements);
+      }
+  }
 
     // ------ Draw the cone --------
 
