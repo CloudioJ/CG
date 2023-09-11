@@ -1,6 +1,6 @@
 "use strict";
 
-function sky() {
+function main() {
   // Get A WebGL context
   /** @type {HTMLCanvasElement} */
   var canvas = document.querySelector("#canvas");
@@ -9,58 +9,44 @@ function sky() {
     return;
   }
 
-  // setup GLSL skyProgram
-  var skyProgram = webglUtils.createProgramFromScripts(gl, ["sky_vs", "sky_fs"]);
+  // setup GLSL programs and lookup locations
+  const envmapProgramInfo = webglUtils.createProgramInfo(
+      gl, ["envmap-vertex-shader", "envmap-fragment-shader"]);
+  const skyboxProgramInfo = webglUtils.createProgramInfo(
+      gl, ["sky_vs", "sky_fs"]);
 
-  // look up where the vertex data needs to go.
-  var positionLocation = gl.getAttribLocation(skyProgram, "a_position");
-
-  // lookup uniforms
-  var skyboxLocation = gl.getUniformLocation(skyProgram, "u_skybox");
-  var viewDirectionProjectionInverseLocation =
-      gl.getUniformLocation(skyProgram, "u_viewDirectionProjectionInverse");
-
-  // Create a buffer for positions
-  var positionBuffer = gl.createBuffer();
-  // Bind it to ARRAY_BUFFER (think of it as ARRAY_BUFFER = positionBuffer)
-  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-  // Put the positions in the buffer
-  setGeometry(gl);
+  // create buffers and fill with vertex data
+  const cubeBufferInfo = primitives.createCubeBufferInfo(gl, 1);
+  const quadBufferInfo = primitives.createXYQuadBufferInfo(gl);
 
   // Create a texture.
-  var texture = gl.createTexture();
+  const texture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
 
   const faceInfos = [
     {
       target: gl.TEXTURE_CUBE_MAP_POSITIVE_X,
-      // url: './skybox/posx.jpg',
-      url: './skybox/skyrender0001.bmp' // CERTO
+      url: './skybox/skyrender0001.bmp',
     },
     {
       target: gl.TEXTURE_CUBE_MAP_NEGATIVE_X,
-      // url: './skybox/negx.jpg',
-      url: './skybox/skyrender0004.bmp' // CERTO
+      url: './skybox/skyrender0004.bmp',
     },
     {
       target: gl.TEXTURE_CUBE_MAP_POSITIVE_Y,
-      // url: './skybox/posy.jpg',
-      url: './skybox/skyrender0003.bmp' // SKY CERTO
+      url: './skybox/skyrender0003.bmp',
     },
     {
       target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Y,
-      // url: './skybox/negy.jpg',
-      url: './skybox/skyrender0006.bmp' // BAIXO
+      url: './skybox/skyrender0006.bmp',
     },
     {
       target: gl.TEXTURE_CUBE_MAP_POSITIVE_Z,
-      // url: './skybox/posz.jpg',
-      url: './skybox/skyrender0005.bmp' // CERTO
+      url: './skybox/skyrender0005.bmp',
     },
     {
       target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Z,
-      // url: './skybox/negz.jpg',
-      url: './skybox/skyrender0002.bmp' // CERTO
+      url: './skybox/skyrender0002.bmp',
     },
   ];
   faceInfos.forEach((faceInfo) => {
@@ -90,15 +76,12 @@ function sky() {
   gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
   gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
 
-
   function degToRad(d) {
     return d * Math.PI / 180;
   }
 
   var fieldOfViewRadians = degToRad(60);
-  var cameraYRotationRadians = degToRad(0);
 
-  var spinCamera = true;
   // Get the starting time.
   var then = 0;
 
@@ -107,9 +90,8 @@ function sky() {
   // Draw the scene.
   function drawScene(time) {
     // convert to seconds
-    time *= 0.0;
+    time *= 0.001;
     // Subtract the previous time from the current time
-    var deltaTime = time - then;
     // Remember the current time for the next frame.
     then = time;
 
@@ -118,85 +100,63 @@ function sky() {
     // Tell WebGL how to convert from clip space to pixels
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
-    // gl.enable(gl.CULL_FACE);
-    // gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.CULL_FACE);
+    gl.enable(gl.DEPTH_TEST);
 
     // Clear the canvas AND the depth buffer.
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    // Tell it to use our skyProgram (pair of shaders)
-    gl.useProgram(skyProgram);
-
-    // Turn on the position attribute
-    gl.enableVertexAttribArray(positionLocation);
-
-    // Bind the position buffer.
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
-    // Tell the position attribute how to get data out of positionBuffer (ARRAY_BUFFER)
-    var size = 2;          // 2 components per iteration
-    var type = gl.FLOAT;   // the data is 32bit floats
-    var normalize = false; // don't normalize the data
-    var stride = 0;        // 0 = move forward size * sizeof(type) each iteration to get the next position
-    var offset = 0;        // start at the beginning of the buffer
-    gl.vertexAttribPointer(
-        positionLocation, size, type, normalize, stride, offset);
-
     // Compute the projection matrix
     var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
     var projectionMatrix =
-        m4.perspective(fieldOfViewRadians, aspect, 0.5, 2000);
+        m4.perspective(fieldOfViewRadians, aspect, 0.1, 2000);
 
     // camera going in circle 2 units from origin looking at origin
-    // var cameraPosition = [Math.cos(time * .1), 0, Math.sin(time * .1)];
-    // var target = [0, 0, 0];
-    // var up = [0, 1, 0];
-    // Compute the camera's matrix using look at.
-    var cameraMatrix = m4.lookAt(cameraPosition, target, up);
 
-    // Make a view matrix from the camera matrix.
-    var viewMatrix = m4.inverse(cameraMatrix);
+    // Rotate the cube around the x axis
+    var worldMatrix = m4.xRotation(time * 0.11);
+    worldMatrix = m4.scale(worldMatrix, 50, 50, 50);
+    const translatedWorldMatrix = m4.scale(worldMatrix, 0, 0, 0);
 
     // We only care about direciton so remove the translation
-    viewMatrix[12] = 0;
-    viewMatrix[13] = 0;
-    viewMatrix[14] = 0;
+    var viewDirectionMatrix = m4.copy(view);
+    viewDirectionMatrix[12] = 0;
+    viewDirectionMatrix[13] = 0;
+    viewDirectionMatrix[14] = 0;
 
-    var viewDirectionProjectionMatrix =
-        m4.multiply(projectionMatrix, viewMatrix);
+    var viewDirectionProjectionMatrix = m4.multiply(
+        projectionMatrix, viewDirectionMatrix);
     var viewDirectionProjectionInverseMatrix =
         m4.inverse(viewDirectionProjectionMatrix);
 
-    // Set the uniforms
-    gl.uniformMatrix4fv(
-        viewDirectionProjectionInverseLocation, false,
-        viewDirectionProjectionInverseMatrix);
+    // draw the cube
+    gl.depthFunc(gl.LESS);  // use the default depth test
+    gl.useProgram(envmapProgramInfo.program);
+    webglUtils.setBuffersAndAttributes(gl, envmapProgramInfo, cubeBufferInfo);
+    webglUtils.setUniforms(envmapProgramInfo, {
+      u_world: worldMatrix,
+      u_view: view,
+      u_projection: projectionMatrix,
+      u_texture: texture,
+      u_worldCameraPosition: cameraPosition,
+    });
+    webglUtils.drawBufferInfo(gl, cubeBufferInfo);
 
-    // Tell the shader to use texture unit 0 for u_skybox
-    gl.uniform1i(skyboxLocation, 0);
+    // draw the skybox
 
     // let our quad pass the depth test at 1.0
     gl.depthFunc(gl.LEQUAL);
 
-    // Draw the geometry.
-    gl.drawArrays(gl.TRIANGLES, 0, 1 * 6);
+    gl.useProgram(skyboxProgramInfo.program);
+    webglUtils.setBuffersAndAttributes(gl, skyboxProgramInfo, quadBufferInfo);
+    webglUtils.setUniforms(skyboxProgramInfo, {
+      u_viewDirectionProjectionInverse: viewDirectionProjectionInverseMatrix,
+      u_skybox: texture,
+    });
+    webglUtils.drawBufferInfo(gl, quadBufferInfo);
 
     requestAnimationFrame(drawScene);
   }
 }
 
-// Fill the buffer with the values that define a quad.
-function setGeometry(gl) {
-  var positions = new Float32Array(
-    [
-      -1, -1,
-       1, -1,
-      -1,  1,
-      -1,  1,
-       1, -1,
-       1,  1,
-    ]);
-  gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
-}
-
-sky();
+main();

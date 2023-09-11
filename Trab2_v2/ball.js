@@ -40,12 +40,7 @@ async function main() {
     var projectionMatrix =
         m4.perspective(fov, aspect, 0.1, 2000);
 
-    var invertedCamera = m4.inverse(camera);
-
-    var viewProjectionMatrix = m4.multiply(
-        projectionMatrix,
-        invertedCamera
-    )
+    
 
     canvas.addEventListener("click", shootBall);
 
@@ -73,6 +68,11 @@ async function main() {
 
         gl.enable(gl.CULL_FACE);
         gl.enable(gl.DEPTH_TEST);
+        
+        var viewProjectionMatrix = m4.multiply(
+            projectionMatrix,
+            view
+        )
 
         console.log("CAMERA =" +cameraPosition+"\n"
         +"TARGET ="+target+"\n"
@@ -81,6 +81,7 @@ async function main() {
         var cubeXRotation   = -time * 20;
         var cubeYRotation   = time;
         var ballScale = [1, 1, 1];
+
         // ------ Draw the sphere --------
 
         gl.useProgram(programInfo.program);
@@ -95,7 +96,6 @@ async function main() {
             cubeYRotation,
             ballScale
         );
-
 
         // Set the uniforms we just computed
         webglUtils.setUniforms(programInfo, cubeUniforms);
