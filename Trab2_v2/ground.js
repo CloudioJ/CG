@@ -5,17 +5,19 @@
 const img = new Image();
 img.onload = run;
 img.crossOrigin = 'anonymous';
-img.src = 'Heightmap.png';
+img.src = './assets/Heightmap.png';
 
 
 function run() {
   // use a canvas 2D to read the image
   const ctx = document.createElement('canvas').getContext('2d');
+
   ctx.canvas.width = img.width;
   ctx.canvas.height = img.height;
   ctx.drawImage(img, 0, 0);
   const imgData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
-
+  
+  // var canvas_stack = new CanvasStack()
 
   function getHeight(offset) {
     const v =  imgData.data[offset * 4]; // x4 because RGBA

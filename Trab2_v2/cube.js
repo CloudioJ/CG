@@ -5,6 +5,7 @@ async function main() {
   /** @type {HTMLCanvasElement} */
   var canvas = document.querySelector("#canvas");
   var gl = canvas.getContext("webgl");
+
   if (!gl) {
     return;
   }
@@ -58,8 +59,6 @@ function computeMatrix(viewProjectionMatrix, translation, xRotation, yRotation, 
  // ------------------ MAKE THE BALL
 
   const sphereBufferInfo = primitives.createSphereWithVertexColorsBufferInfo(gl, 10,12,6);
-    
-  var shots = 5
 
   var sphereUniforms = {
     u_colorMult: [0.5, 1, 0.5, 1],
@@ -92,6 +91,7 @@ function computeMatrix(viewProjectionMatrix, translation, xRotation, yRotation, 
               if (distance < 20) { // Adjust this threshold as needed
                   cube.visible = false; // Cube disappears on collision
                   popAudio.play();
+                  totalPoints += 1;
                   return true; // Collision detected
               }
           }
