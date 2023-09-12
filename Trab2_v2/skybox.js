@@ -8,6 +8,15 @@ function main() {
   if (!gl) {
     return;
   }
+  
+  const waves = new Audio('./sounds/sandy-beach-calm-waves-water-nature-sounds-8052.mp3');
+  waves.volume = 0.1;
+  waves.loop = true;
+
+  const bgMusic = new Audio('./sounds/01 Calm 1.mp3');
+  bgMusic.volume = 0.5;
+  bgMusic.loop = true;
+  
 
   // setup GLSL programs and lookup locations
   const envmapProgramInfo = webglUtils.createProgramInfo(
@@ -95,6 +104,8 @@ function main() {
     // Remember the current time for the next frame.
     then = time;
 
+    waves.play();
+    bgMusic.play();
     webglUtils.resizeCanvasToDisplaySize(gl.canvas);
 
     // Tell WebGL how to convert from clip space to pixels

@@ -9,6 +9,9 @@ async function main() {
     return;
   }
 
+  const airAudio = new Audio('./sounds/mixkit-long-hit-swoosh-1473.wav');
+  const popAudio = new Audio('./sounds/pop.mp4');
+  airAudio.volume = 0.1;
   // creates buffers with position, normal, texcoord, and vertex color
   // data for primitives by calling gl.createBuffer, gl.bindBuffer,
   // and gl.bufferData
@@ -56,6 +59,8 @@ function computeMatrix(viewProjectionMatrix, translation, xRotation, yRotation, 
 
   const sphereBufferInfo = primitives.createSphereWithVertexColorsBufferInfo(gl, 10,12,6);
     
+  var shots = 5
+
   var sphereUniforms = {
     u_colorMult: [0.5, 1, 0.5, 1],
     u_matrix: m4.identity(),
@@ -68,11 +73,15 @@ function computeMatrix(viewProjectionMatrix, translation, xRotation, yRotation, 
 
     function shootBall(event) {
         // Calculate the direction from the camera to the target
-        var rayDirection = m4.normalize(m4.subtractVectors(target, cameraPosition));
-        
-        // Set the initial position and velocity of the ball
-        ballPosition = cameraPosition.slice(); // Copy camera position
-        ballVelocity = [rayDirection[0] * 2, rayDirection[1] * 2, rayDirection[2] * 2]; // Adjust velocity as needed
+        if (shots > 0) {
+          airAudio.play();
+          var rayDirection = m4.normalize(m4.subtractVectors(target, cameraPosition));
+          
+          // Set the initial position and velocity of the ball
+          ballPosition = cameraPosition.slice(); // Copy camera position
+          ballVelocity = [rayDirection[0] * 2, rayDirection[1] * 2, rayDirection[2] * 2]; // Adjust velocity as needed
+          shots -= 1;
+        }
     }
 
     // Function to check if the ball hits an object
@@ -82,6 +91,7 @@ function computeMatrix(viewProjectionMatrix, translation, xRotation, yRotation, 
               const distance = m4.distance(position, cube.position);
               if (distance < 20) { // Adjust this threshold as needed
                   cube.visible = false; // Cube disappears on collision
+                  popAudio.play();
                   return true; // Collision detected
               }
           }
