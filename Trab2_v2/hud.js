@@ -21,10 +21,10 @@ function updateHUD() {
     ctx.fillText("Points: ", 50, 50);
     crosshair.onload = () => {
         ctx.clearRect(0, 0, 1920, 1080);
-        ctx.drawImage(crosshair, 700, 300, 100, 100);
+        ctx.drawImage(crosshair, 660, 320, 100, 100);
         if(shots == 0 && totalPoints == 5){
             ctx.drawImage(winImg, 600, 200, 300, 300);
-            ctx.fillText("You won!", 655, 500);
+            ctx.fillText("You won!", 650, 500);
         }
         if(shots == 0 && totalPoints < 5){
             ctx.drawImage(loseImg, 600, 200, 300, 300);

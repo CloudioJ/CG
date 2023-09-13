@@ -16,24 +16,11 @@ function run() {
   ctx.canvas.height = img.height;
   ctx.drawImage(img, 0, 0);
   const imgData = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
-  
-  // var canvas_stack = new CanvasStack()
 
   function getHeight(offset) {
     const v =  imgData.data[offset * 4]; // x4 because RGBA
     return v * 10 / 255; // 0 to 10
   }
-
-  // first generate a grid of triangles, at least 2 or 4 for each cell
-  // 
-  //    2          4
-  // +----+     +----+ 
-  // |   /|     |\  /|
-  // |  / |     | \/ |
-  // | /  |     | /\ |
-  // |/   |     |/  \|
-  // +----+     +----+ 
-  //
 
   const positions = [];
   const texcoords = [];
@@ -104,38 +91,143 @@ function run() {
   const gl = document.querySelector('canvas').getContext('webgl');
 
   const vs = `
-  attribute vec4 position;
-  attribute vec3 normal;
-  attribute vec2 texcoord;
+    attribute vec4 position;
+    attribute vec3 normal;
+    attribute vec2 texcoord;
 
-  uniform mat4 projection;
-  uniform mat4 modelView;
+    uniform mat4 projection;
+    uniform mat4 modelView;
 
-  varying vec3 v_normal;
-  varying vec2 v_texcoord;
+    varying vec3 v_normal;
+    varying vec2 v_texcoord;
 
-  void main() {
-    gl_Position = projection * modelView * position;
-    v_normal = mat3(modelView) * normal;
-    v_texcoord = texcoord;
-  }
-  `;
+    void main() {
+      gl_Position = projection * modelView * position;
+      v_normal = mat3(modelView) * normal;
+      v_texcoord = texcoord;
+    }
+`;
 
   const fs = `
-  precision highp float;
+    precision highp float;
 
-  varying vec3 v_normal;
-  varying vec2 v_texcoord;
-  varying float v_modelId;
+    varying vec3 v_normal;
+    varying vec2 v_texcoord;
+
+    // Add a uniform for the texture sampler
+    uniform sampler2D u_texture;
 
   void main() {
-    vec3 lightDirection = normalize(vec3(1, 2, -3));  // arbitrary light direction
+    vec3 lightDirection = normalize(vec3(2, 2, -4));  // arbitrary light direction
 
-    float l = dot(lightDirection, normalize(v_normal)) * .5 + .5;
-    gl_FragColor = vec4(vec3(0,1,0) * l, 1);
+    // Sample the texture using the v_texcoord coordinates
+    vec4 texColor = texture2D(u_texture, v_texcoord);
+
+    vec3 color = vec3(0.1, 0.9, 0.1);
+    float l = dot(lightDirection, normalize(v_normal)) * 0.5 + 0.5;
+
+    // Use the texture color for the fragment color
+    gl_FragColor = vec4(color * l, 1);
   }
   `;
 
+//   const fs = `
+//   precision highp float;
+
+//   varying vec3 v_normal;
+//   varying vec2 v_texcoord;
+
+//   // Add a uniform for the texture sampler
+//   uniform sampler2D u_texture;
+
+//   void main() {
+//     vec3 lightDirection = normalize(vec3(1, 2, -3));  // arbitrary light direction
+
+//     // Sample the texture using the v_texcoord coordinates
+//     vec4 texColor = texture2D(u_texture, v_texcoord);
+
+//     vec3 color = vec3(0.4, 0.7, 0.9);
+
+//     // Define a threshold value to determine "higher up" normals
+//     float threshold = -3.1; // Adjust this value as needed
+
+//     // Check if the Y component of the normal is above the threshold
+//     if (v_normal.x >= threshold) {
+//       // If it's higher up, change the color
+//       float l = dot(lightDirection, normalize(v_normal)) * 0.5 + 0.5;
+//       gl_FragColor = vec4(vec3(1.0, 1, 1) * l, 1); // Red color for higher up normals
+//     } else {
+//       // If it's not higher up, use the texture color
+//       float l = dot(lightDirection, normalize(v_normal)) * 0.5 + 0.5;
+//       gl_FragColor = vec4(color * l, 1);
+//     }
+//   }
+// `;
+// const fs = `
+//   precision highp float;
+
+//   varying vec3 v_normal;
+//   varying vec2 v_texcoord;
+
+//   // Add a uniform for the texture sampler
+//   uniform sampler2D u_texture;
+
+//   void main() {
+//     vec3 lightDirection = normalize(vec3(1, 2, -3));  // arbitrary light direction
+
+//     // Sample the texture using the v_texcoord coordinates
+//     vec4 texColor = texture2D(u_texture, v_texcoord);
+
+//     // Define colors for higher and lower normals
+//     vec3 higherUpColor = vec3(0.9, 0.9, 0.9);  // Red color for higher normals
+//     vec3 lowerColor = vec3(1, 0.7, 0);     // Blue color for lower normals
+
+//     // Determine the color based on the Y-component of the normals
+//     float l = dot(lightDirection, normalize(v_normal)) * 0.8 + 0.2;
+//     vec3 color = mix(lowerColor, higherUpColor, v_normal.y); // Interpolate between colors
+
+//     // Use the texture color for the fragment color
+//     gl_FragColor = vec4(color * l, 1);
+//   }
+// `;
+
+// const fs = `
+//   precision highp float;
+
+//   varying vec3 v_normal;
+//   varying vec2 v_texcoord;
+
+//   // Add a uniform for the texture sampler
+//   uniform sampler2D u_texture;
+
+//   // Define the fixed light position in world coordinates
+//   uniform vec3 u_lightPosition; // You need to set this in your JavaScript code
+
+//   // Add a uniform for the camera view matrix
+//   uniform mat4 u_viewMatrix; // You need to set this in your JavaScript code
+
+//   void main() {
+//     // Transform the light position into camera space
+//     vec4 lightPositionCameraSpace = u_viewMatrix * vec4(u_lightPosition, 1.0);
+
+//     // Compute the light direction from the transformed light position
+//     vec3 lightDirection = normalize(lightPositionCameraSpace.xyz - gl_FragCoord.xyz);
+
+//     // Sample the texture using the v_texcoord coordinates
+//     vec4 texColor = texture2D(u_texture, v_texcoord);
+
+//     // Define colors for higher and lower normals
+//     vec3 higherUpColor = vec3(0.1, 0.8, 0.1);  // Red color for higher normals
+//     vec3 lowerColor = vec3(0, 1, 0);         // Blue color for lower normals
+
+//     // Determine the color based on the Y-component of the normals
+//     float l = dot(lightDirection, normalize(v_normal)) * 0.2 + 0.3;
+//     vec3 color = mix(lowerColor, higherUpColor, v_normal.y); // Interpolate between colors
+
+//     // Use the texture color for the fragment color
+//     gl_FragColor = vec4(color * l, 1);
+//   }
+// `;
   // compile shader, link, look up locations
   const programInfo = twgl.createProgramInfo(gl, [vs, fs]);
 
@@ -146,6 +238,11 @@ function run() {
   function degToRad(d) {
     return d * Math.PI / 180;
   }
+
+  const texture = twgl.createTexture(gl, {
+    src: 'green-ground-texture.jpeg',
+    crossOrigin: '',
+  });
 
   console.log(imgData.width / -2, imgData.height/-2);
 
@@ -169,6 +266,10 @@ function run() {
 
     gl.useProgram(programInfo.program);
 
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    // gl.uniform1i(programInfo.uniforms.u_texture, 0)
+
     // calls gl.bindBuffer, gl.enableVertexAttribArray, gl.vertexAttribPointer
     twgl.setBuffersAndAttributes(gl, programInfo, bufferInfo);
 
@@ -176,6 +277,9 @@ function run() {
     twgl.setUniforms(programInfo, {
       projection,
       modelView,
+      u_texture: texture,
+      u_lightPosition: [0, 400, 0],
+      u_viewMatrix: view,
     });  
 
     // calls gl.drawArrays or gl.drawElements
@@ -227,23 +331,6 @@ function run() {
       tempVerts[vertId] = newNdx;
       return newNdx;
     }
-
-    // We need to figure out the shared vertices.
-    // It's not as simple as looking at the faces (triangles)
-    // because for example if we have a standard cylinder
-    //
-    //
-    //      3-4
-    //     /   \
-    //    2     5   Looking down a cylinder starting at S
-    //    |     |   and going around to E, E and S are not
-    //    1     6   the same vertex in the data we have
-    //     \   /    as they don't share UV coords.
-    //      S/E
-    //
-    // the vertices at the start and end do not share vertices
-    // since they have different UVs but if you don't consider
-    // them to share vertices they will get the wrong normals
 
     const vertIndices = [];
     for (let i = 0; i < numVerts; ++i) {
@@ -368,5 +455,3 @@ function run() {
         : makeUnindexedIndicesFn(arrays);
   }
 }
-
-

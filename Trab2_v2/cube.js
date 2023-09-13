@@ -16,23 +16,19 @@ async function main() {
   // creates buffers with position, normal, texcoord, and vertex color
   // data for primitives by calling gl.createBuffer, gl.bindBuffer,
   // and gl.bufferData
-  const cubeBufferInfo   = primitives.createCubeWithVertexColorsBufferInfo(gl, 20);
+  const cubeBufferInfo = primitives.createCubeWithVertexColorsBufferInfo(gl, 20);
   
   // setup GLSL program
   var programInfo = webglUtils.createProgramInfo(gl, ["cube_vs", "cube_fs"]);
+  var sphereProgramInfo = webglUtils.createProgramInfo(gl, ["ball_vs", "ball_fs"]);
 
   function degToRad(d) {
     return d * Math.PI / 180;
   }
 
-  var fieldOfViewRadians = degToRad(60);
-
+  const cubeTex = await loadTexture(gl, './green_ground_texture.jpg');
   // Uniforms for each object.
-  var cubeUniforms = {
-    u_colorMult: [1, 0.5, 0.5, 1],
-    u_matrix: m4.identity(),
-  };
-
+  
   var cubePositions = [
     [10, -30, 100],
     [-110, 0, -90],
@@ -40,34 +36,32 @@ async function main() {
     [80, -70, -600],
     [200, -20, -140],
     [-80, -50, -400],
-]
+  ]
 
+  
   var cubes = cubePositions.map((position) => ({
     position,
     visible: true,
   }));
 
-function computeMatrix(viewProjectionMatrix, translation, xRotation, yRotation, scale) {
-  var matrix = m4.identity();
-    matrix = m4.translate(matrix, translation[0], translation[1], translation[2]);
-    matrix = m4.xRotate(matrix, xRotation);
-    matrix = m4.yRotate(matrix, yRotation);
-    matrix = m4.scale(matrix, scale[0], scale[1], scale[2]);
-  return m4.multiply(viewProjectionMatrix, matrix);
-}
+  function computeMatrix(viewProjectionMatrix, translation, xRotation, yRotation, scale) {
+    var matrix = m4.identity();
+      matrix = m4.translate(matrix, translation[0], translation[1], translation[2]);
+      matrix = m4.xRotate(matrix, xRotation);
+      matrix = m4.yRotate(matrix, yRotation);
+      matrix = m4.scale(matrix, scale[0], scale[1], scale[2]);
+    return m4.multiply(viewProjectionMatrix, matrix);
+  }
 
  // ------------------ MAKE THE BALL
 
   const sphereBufferInfo = primitives.createSphereWithVertexColorsBufferInfo(gl, 10,12,6);
 
-  var sphereUniforms = {
-    u_colorMult: [0.5, 1, 0.5, 1],
-    u_matrix: m4.identity(),
-  };
-
+  
   var ballPosition = [0, 0, 0];
   var ballVelocity = [0, 0, 0];
-
+  
+  
   canvas.addEventListener("click", shootBall);
 
     function shootBall(event) {
@@ -99,45 +93,29 @@ function computeMatrix(viewProjectionMatrix, translation, xRotation, yRotation, 
       return false; // No collision
   }
 
-
-  // setup GLSL program
-  // var programInfo = webglUtils.createProgramInfo(gl, ["cube_vs", "cube_fs"]);
   requestAnimationFrame(drawScene);
 
   // Draw the scene.
   function drawScene(time) {
-    time *= 0.0005;
+    time *= 0.001;
 
     webglUtils.resizeCanvasToDisplaySize(gl.canvas);
     ballPosition[0] += ballVelocity[0] * 2;
     ballPosition[1] += ballVelocity[1] * 2;
     ballPosition[2] += ballVelocity[2] * 2;
 
-    // Tell WebGL how to convert from clip space to pixels
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.DEPTH_TEST);
 
-    // Clear the canvas AND the depth buffer.
-    // gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-    // const fov = degToRad(0);
-    // Compute the projection matrix
     var aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
     var projectionMatrix =
         m4.perspective(fov, aspect, 0.1, 2000);
 
-    // var cameraMatrix = m4.lookAt(
-    //     cameraPosition,
-    //     target,
-    //     up,
-    // )
     var invertedCamera = m4.inverse(camera);
 
-    // var multipliedCamera = m4.multiply(
-    //     invertedCamera,
-    // )
+
     var viewProjectionMatrix = m4.multiply(
         projectionMatrix,
         invertedCamera
@@ -147,14 +125,7 @@ function computeMatrix(viewProjectionMatrix, translation, xRotation, yRotation, 
       // Ball hit an object, so reset its position and velocity
       ballPosition = [0, 0, 0];
       ballVelocity = [0, 0, 0];
-
-      // Optionally, you can make the object disappear by removing it from the rendering loop or
-      // by setting its visibility to false in the draw function.
-
-      // You can also add any other logic you need to handle the collision.
-  }
-
-    // var viewProjectionMatrix = m4.multiply(projectionMatrix, view);
+    }
 
     var cubeXRotation   = -time;
     var cubeYRotation   = time;
@@ -163,12 +134,28 @@ function computeMatrix(viewProjectionMatrix, translation, xRotation, yRotation, 
     var sphereXRotation   = -time * 20;
     var sphereYRotation   = time *20;
     var sphereScale = [1, 1, 1];
+
     // ------ Draw the sphere --------
 
-    gl.useProgram(programInfo.program);
+    gl.useProgram(sphereProgramInfo.program);
 
-    webglUtils.setBuffersAndAttributes(gl, programInfo, sphereBufferInfo);
+    webglUtils.setBuffersAndAttributes(gl, sphereProgramInfo, sphereBufferInfo);
         
+    var sphereUniforms = {
+      u_colorMult: [0.5, 1, 0.5, 1],
+      u_matrix: m4.identity(),
+      u_LightPosition: ballPosition,
+    };
+
+    
+    var cubeUniforms = {
+      u_colorMult: [1, 0.5, 0.5, 1],
+      u_matrix: m4.identity(),
+      u_texture: cubeTex,
+      u_LightPosition: ballPosition,
+    };
+    // console.log(ballPosition)
+    
     sphereUniforms.u_matrix = computeMatrix(
         viewProjectionMatrix,
         ballPosition,
@@ -178,13 +165,14 @@ function computeMatrix(viewProjectionMatrix, translation, xRotation, yRotation, 
     );
 
     // Set the uniforms we just computed
-    webglUtils.setUniforms(programInfo, sphereUniforms);
+    webglUtils.setUniforms(sphereProgramInfo, sphereUniforms);
 
     gl.drawArrays(gl.TRIANGLES, 0, sphereBufferInfo.numElements);
 
     // ------ Draw the cube --------
 
     // Setup all the needed attributes.
+    gl.useProgram(programInfo.program);
     webglUtils.setBuffersAndAttributes(gl, programInfo, cubeBufferInfo);
 
     for (const cube of cubes) {
@@ -203,11 +191,34 @@ function computeMatrix(viewProjectionMatrix, translation, xRotation, yRotation, 
           gl.drawArrays(gl.TRIANGLES, 0, cubeBufferInfo.numElements);
       }
   }
-
-    // ------ Draw the cone --------
-
     requestAnimationFrame(drawScene);
   }
+}
+
+async function loadTexture(gl, url) {
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+
+  // Fill the texture with a 1x1 pixel blue color while waiting for the image to load
+  const level = 0;
+  const internalFormat = gl.RGBA;
+  const width = 1;
+  const height = 1;
+  const border = 0;
+  const srcFormat = gl.RGBA;
+  const srcType = gl.UNSIGNED_BYTE;
+  const pixel = new Uint8Array([0, 0, 255, 255]); // blue color
+  gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, width, height, border, srcFormat, srcType, pixel);
+
+  const image = new Image();
+  image.onload = function () {
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, image);
+    gl.generateMipmap(gl.TEXTURE_2D);
+  };
+  image.src = url;
+
+  return texture;
 }
 
 main();
